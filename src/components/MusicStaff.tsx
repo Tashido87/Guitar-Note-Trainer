@@ -146,6 +146,14 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
         className="overflow-visible w-full max-w-full"
         aria-label="Musical staff displaying guitar notes"
       >
+        <defs>
+          {/* Subtle neon glow for selected active note */}
+          <filter id="neon-glow-active" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#0284c7" floodOpacity="0.8" />
+            <feDropShadow dx="0" dy="0" stdDeviation="1.5" floodColor="#38bdf8" floodOpacity="0.95" />
+          </filter>
+        </defs>
+
         {/* 5 Staff Lines */}
         {[0, 1, 2, 3, 4].map((i) => {
           const y = staffTopY + i * lineSpacing;
@@ -284,40 +292,29 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
               onClick={(e) => interactive && handleSingleNoteClick(e, n, idx)}
               className={interactive ? 'cursor-pointer' : ''}
             >
-              {/* Active Note Target Glow & Indicator */}
+              {/* Active Note Step Indicator Pointer (above staff) */}
               {isActive && (
-                <g>
-                  {/* Subtle high-contrast target ring */}
-                  <ellipse
-                    cx={noteX}
-                    cy={noteY}
-                    rx={noteRadiusX + 7}
-                    ry={noteRadiusY + 7}
-                    className="fill-blue-600/10 stroke-blue-700 dark:stroke-sky-400 stroke-2"
+                <g transform={`translate(${noteX}, ${staffTopY - 26})`}>
+                  <rect
+                    x="-11"
+                    y="0"
+                    width="22"
+                    height="16"
+                    rx="4"
+                    className="fill-blue-800 dark:fill-sky-500 shadow-xs"
                   />
-                  {/* Active step number pointer above staff */}
-                  <g transform={`translate(${noteX}, ${staffTopY - 26})`}>
-                    <rect
-                      x="-11"
-                      y="0"
-                      width="22"
-                      height="16"
-                      rx="4"
-                      className="fill-blue-800 dark:fill-sky-500"
-                    />
-                    <text
-                      x="0"
-                      y="12"
-                      textAnchor="middle"
-                      className="fill-white font-bold text-[10px]"
-                    >
-                      {idx + 1}
-                    </text>
-                    <polygon
-                      points="-4,16 4,16 0,20"
-                      className="fill-blue-800 dark:fill-sky-500"
-                    />
-                  </g>
+                  <text
+                    x="0"
+                    y="12"
+                    textAnchor="middle"
+                    className="fill-white font-bold text-[10px]"
+                  >
+                    {idx + 1}
+                  </text>
+                  <polygon
+                    points="-4,16 4,16 0,20"
+                    className="fill-blue-800 dark:fill-sky-500"
+                  />
                 </g>
               )}
 
@@ -336,40 +333,43 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
                 />
               ))}
 
-              {/* Note Head: rotated ellipse */}
-              <ellipse
-                cx={noteX}
-                cy={noteY}
-                rx={noteRadiusX}
-                ry={noteRadiusY}
-                transform={`rotate(-22 ${noteX} ${noteY})`}
-                className={`${noteColorClass} transition-colors duration-200`}
-              />
+              {/* Note Head & Stem with optional Neon Glow on selection */}
+              <g filter={isActive ? 'url(#neon-glow-active)' : undefined}>
+                {/* Note Head: rotated ellipse */}
+                <ellipse
+                  cx={noteX}
+                  cy={noteY}
+                  rx={noteRadiusX}
+                  ry={noteRadiusY}
+                  transform={`rotate(-22 ${noteX} ${noteY})`}
+                  className={`${noteColorClass} transition-colors duration-200`}
+                />
 
-              {/* Note Stem */}
-              {stemDirection === 'up' ? (
-                <line
-                  x1={noteX + noteRadiusX - 1.5}
-                  y1={noteY - 2}
-                  x2={noteX + noteRadiusX - 1.5}
-                  y2={noteY - stemLength}
-                  stroke="currentColor"
-                  className={`${noteColorClass} transition-colors duration-200`}
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                />
-              ) : (
-                <line
-                  x1={noteX - noteRadiusX + 1.5}
-                  y1={noteY + 2}
-                  x2={noteX - noteRadiusX + 1.5}
-                  y2={noteY + stemLength}
-                  stroke="currentColor"
-                  className={`${noteColorClass} transition-colors duration-200`}
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                />
-              )}
+                {/* Note Stem */}
+                {stemDirection === 'up' ? (
+                  <line
+                    x1={noteX + noteRadiusX - 1.5}
+                    y1={noteY - 2}
+                    x2={noteX + noteRadiusX - 1.5}
+                    y2={noteY - stemLength}
+                    stroke="currentColor"
+                    className={`${noteColorClass} transition-colors duration-200`}
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                  />
+                ) : (
+                  <line
+                    x1={noteX - noteRadiusX + 1.5}
+                    y1={noteY + 2}
+                    x2={noteX - noteRadiusX + 1.5}
+                    y2={noteY + stemLength}
+                    stroke="currentColor"
+                    className={`${noteColorClass} transition-colors duration-200`}
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                  />
+                )}
+              </g>
 
               {/* Note Index label under note for multi-note cards */}
               {notesList.length > 1 && (

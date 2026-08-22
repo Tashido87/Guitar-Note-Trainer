@@ -40,11 +40,13 @@ export default function App() {
   const [preferences, setPreferences] = useState<UserPreferences>(() => loadUserPreferences());
   const [activeTab, setActiveTab] = useState<TrainingMode | 'mastery'>(preferences.lastTab || 'memory-tricks');
   const [isMuted, setIsMuted] = useState<boolean>(preferences.isMuted);
+  const [instrument, setInstrument] = useState<'guitar' | 'piano'>(preferences.instrument || 'guitar');
   const [stats, setStats] = useState<StoredGameStats>(() => loadStoredStats());
 
-  // Keep audio system synchronized with initial mute state
+  // Keep audio system synchronized with initial mute state and instrument
   useEffect(() => {
     soundManager.setMuted(preferences.isMuted);
+    soundManager.setInstrument(preferences.instrument || 'guitar');
   }, []);
 
   // Persist preferences when updated
@@ -67,6 +69,14 @@ export default function App() {
     setIsMuted(nextMuted);
     soundManager.setMuted(nextMuted);
     setPreferences(prev => ({ ...prev, isMuted: nextMuted }));
+  };
+
+  const handleInstrumentChange = (inst: 'guitar' | 'piano') => {
+    setInstrument(inst);
+    soundManager.setInstrument(inst);
+    setPreferences(prev => ({ ...prev, instrument: inst }));
+    // Quick preview chime
+    soundManager.playNote(329.63, 1.2);
   };
 
   const handleUpdateStats = (
@@ -212,6 +222,10 @@ export default function App() {
       saveUserPreferences(importedPrefs);
       setIsMuted(importedPrefs.isMuted);
       soundManager.setMuted(importedPrefs.isMuted);
+      if (importedPrefs.instrument) {
+        setInstrument(importedPrefs.instrument);
+        soundManager.setInstrument(importedPrefs.instrument);
+      }
     }
   };
 
@@ -238,8 +252,40 @@ export default function App() {
             </div>
           </div>
 
-          {/* Right Action Tools (Daily Streak, Active Streak, Sound toggle) */}
+          {/* Right Action Tools (Instrument Switcher, Daily Streak, Active Streak, Sound toggle) */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Instrument Sound Switcher (Guitar vs Piano) */}
+            <div className="flex items-center p-0.5 rounded-xl bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700">
+              <button
+                id="instrument-guitar-btn"
+                type="button"
+                onClick={() => handleInstrumentChange('guitar')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                  instrument === 'guitar'
+                    ? 'bg-amber-500 text-stone-950 shadow-xs'
+                    : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
+                }`}
+                title="Play Acoustic Guitar Note Sounds"
+              >
+                <Guitar className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Guitar</span>
+              </button>
+              <button
+                id="instrument-piano-btn"
+                type="button"
+                onClick={() => handleInstrumentChange('piano')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                  instrument === 'piano'
+                    ? 'bg-sky-500 text-white shadow-xs'
+                    : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
+                }`}
+                title="Play Grand Piano Note Sounds"
+              >
+                <Music className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Piano</span>
+              </button>
+            </div>
+
             {/* Daily Streak Indicator */}
             <div 
               className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-sky-500/10 border border-sky-500/20 text-xs font-bold text-sky-700 dark:text-sky-400"

@@ -1,6 +1,9 @@
-class GuitarAudioSynthesizer {
+export type InstrumentType = 'guitar' | 'piano';
+
+class InstrumentAudioSynthesizer {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
+  private instrument: InstrumentType = 'guitar';
 
   private initContext() {
     if (!this.ctx) {
@@ -20,10 +23,46 @@ class GuitarAudioSynthesizer {
     return this.isMuted;
   }
 
+  public setInstrument(instrument: InstrumentType) {
+    this.instrument = instrument;
+  }
+
+  public getInstrument(): InstrumentType {
+    return this.instrument;
+  }
+
+  /**
+   * Universal note player routing to current selected instrument
+   */
+  public playNote(frequency: number, duration?: number) {
+    if (this.instrument === 'piano') {
+      this.playPianoNote(frequency, duration || 2.6);
+    } else {
+      this.playGuitarNote(frequency, duration || 2.2);
+    }
+  }
+
+  /**
+   * Universal sequence player routing to current selected instrument
+   */
+  public playSequence(frequencies: number[], intervalMs: number = 320) {
+    if (this.isMuted || frequencies.length === 0) return;
+    frequencies.forEach((freq, idx) => {
+      setTimeout(() => {
+        if (!this.isMuted) {
+          this.playNote(freq, 1.8);
+        }
+      }, idx * intervalMs);
+    });
+  }
+
   /**
    * Play an acoustic guitar plucked note sound
    */
   public playGuitarNote(frequency: number, duration: number = 2.2) {
+    if (this.instrument === 'piano') {
+      return this.playPianoNote(frequency, duration);
+    }
     if (this.isMuted) return;
     try {
       this.initContext();
@@ -31,7 +70,7 @@ class GuitarAudioSynthesizer {
 
       const now = this.ctx.currentTime;
 
-      // Master gain for this note
+      // Master gain for this guitar note
       const noteGain = this.ctx.createGain();
       noteGain.gain.setValueAtTime(0.001, now);
       noteGain.gain.exponentialRampToValueAtTime(0.7, now + 0.012);
@@ -110,14 +149,129 @@ class GuitarAudioSynthesizer {
   }
 
   /**
-   * Play a sequence of guitar notes in rhythm
+   * Play a Grand Piano struck key sound
+   */
+  public playPianoNote(frequency: number, duration: number = 2.6) {
+    if (this.isMuted) return;
+    try {
+      this.initContext();
+      if (!this.ctx) return;
+
+      const now = this.ctx.currentTime;
+
+      // Master gain for piano note (fast percussive hammer strike with singing sustain)
+      const masterGain = this.ctx.createGain();
+      masterGain.gain.setValueAtTime(0.0001, now);
+      masterGain.gain.linearRampToValueAtTime(0.85, now + 0.003); // Instant hammer strike
+      masterGain.gain.exponentialRampToValueAtTime(0.45, now + 0.12); // Initial drop
+      masterGain.gain.exponentialRampToValueAtTime(0.25, now + 0.6); // Singing piano sustain
+      masterGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      // Piano soundboard & acoustic chamber filtering
+      const soundboardFilter = this.ctx.createBiquadFilter();
+      soundboardFilter.type = 'lowpass';
+      // Piano hammer dynamic brightness
+      soundboardFilter.frequency.setValueAtTime(Math.min(frequency * 8, 8000), now);
+      soundboardFilter.frequency.exponentialRampToValueAtTime(Math.min(frequency * 2.8, 3200), now + 0.4);
+      soundboardFilter.Q.value = 1.2;
+
+      // Piano String Harmonics & Unisons (Dual/Triple string choir effect)
+      // Real grand pianos have slight string stretch and detuning
+      const partials = [
+        // Fundamental with 2 detuned unison strings
+        { mult: 1.0, detune: -1.2, gain: 0.55, type: 'sine' as OscillatorType },
+        { mult: 1.0, detune: 1.2, gain: 0.55, type: 'sine' as OscillatorType },
+        // 2nd Harmonic (Octave)
+        { mult: 2.001, detune: 0, gain: 0.28, type: 'sine' as OscillatorType },
+        // 3rd Harmonic (Fifth)
+        { mult: 3.003, detune: -0.5, gain: 0.14, type: 'sine' as OscillatorType },
+        // 4th Harmonic (2nd Octave)
+        { mult: 4.008, detune: 0.5, gain: 0.07, type: 'triangle' as OscillatorType },
+        // 5th Harmonic
+        { mult: 5.015, detune: 0, gain: 0.035, type: 'sine' as OscillatorType },
+      ];
+
+      partials.forEach(p => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const pGain = this.ctx.createGain();
+
+        osc.type = p.type;
+        osc.frequency.setValueAtTime(frequency * p.mult, now);
+        osc.detune.setValueAtTime(p.detune, now);
+
+        // Higher harmonics decay faster
+        const decayTime = duration / Math.pow(p.mult, 0.65);
+        pGain.gain.setValueAtTime(p.gain, now);
+        pGain.gain.exponentialRampToValueAtTime(0.0001, now + Math.max(decayTime, 0.3));
+
+        osc.connect(pGain);
+        pGain.connect(soundboardFilter);
+
+        osc.start(now);
+        osc.stop(now + duration);
+      });
+
+      // Felt Hammer Thump / Strike Transient
+      const hammerNoiseLength = Math.floor(this.ctx.sampleRate * 0.018);
+      const hammerBuffer = this.ctx.createBuffer(1, hammerNoiseLength, this.ctx.sampleRate);
+      const hammerData = hammerBuffer.getChannelData(0);
+      for (let i = 0; i < hammerNoiseLength; i++) {
+        hammerData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (hammerNoiseLength * 0.25));
+      }
+
+      const hammerSource = this.ctx.createBufferSource();
+      hammerSource.buffer = hammerBuffer;
+      const hammerFilter = this.ctx.createBiquadFilter();
+      hammerFilter.type = 'bandpass';
+      hammerFilter.frequency.value = Math.min(frequency * 2.2, 2400);
+      hammerFilter.Q.value = 2.0;
+
+      const hammerGain = this.ctx.createGain();
+      hammerGain.gain.setValueAtTime(0.35, now);
+      hammerGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.025);
+
+      hammerSource.connect(hammerFilter);
+      hammerFilter.connect(hammerGain);
+      hammerGain.connect(masterGain);
+
+      hammerSource.start(now);
+      hammerSource.stop(now + 0.03);
+
+      soundboardFilter.connect(masterGain);
+      masterGain.connect(this.ctx.destination);
+    } catch {
+      // AudioContext fallback
+    }
+  }
+
+  /**
+   * Play a sequence of guitar notes in rhythm (legacy wrapper)
    */
   public playGuitarSequence(frequencies: number[], intervalMs: number = 320) {
+    if (this.instrument === 'piano') {
+      this.playPianoSequence(frequencies, intervalMs);
+    } else {
+      if (this.isMuted || frequencies.length === 0) return;
+      frequencies.forEach((freq, idx) => {
+        setTimeout(() => {
+          if (!this.isMuted) {
+            this.playGuitarNote(freq, 1.8);
+          }
+        }, idx * intervalMs);
+      });
+    }
+  }
+
+  /**
+   * Play a sequence of piano notes in rhythm
+   */
+  public playPianoSequence(frequencies: number[], intervalMs: number = 320) {
     if (this.isMuted || frequencies.length === 0) return;
     frequencies.forEach((freq, idx) => {
       setTimeout(() => {
         if (!this.isMuted) {
-          this.playGuitarNote(freq, 1.8);
+          this.playPianoNote(freq, 2.0);
         }
       }, idx * intervalMs);
     });
@@ -133,7 +287,7 @@ class GuitarAudioSynthesizer {
       if (!this.ctx) return;
       const now = this.ctx.currentTime;
 
-      // Bright happy chord (C5 + G5)
+      // Bright happy chord (C5 + E5 + G5)
       [523.25, 659.25, 783.99].forEach((freq, idx) => {
         if (!this.ctx) return;
         const osc = this.ctx.createOscillator();
@@ -222,4 +376,4 @@ class GuitarAudioSynthesizer {
   }
 }
 
-export const soundManager = new GuitarAudioSynthesizer();
+export const soundManager = new InstrumentAudioSynthesizer();

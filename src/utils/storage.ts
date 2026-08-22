@@ -51,8 +51,11 @@ export interface StoredGameStats extends GameStats {
   stringMastery: Record<number, number>;
 }
 
+export type InstrumentType = 'guitar' | 'piano';
+
 export interface UserPreferences {
   isMuted: boolean;
+  instrument: InstrumentType;
   lastTab: TrainingMode | 'mastery';
   flashcardStringFilter: number | null;
   flashcardNoteCount: 1 | 2 | 4;
@@ -61,6 +64,7 @@ export interface UserPreferences {
 
 export const DEFAULT_USER_PREFS: UserPreferences = {
   isMuted: false,
+  instrument: 'guitar',
   lastTab: 'memory-tricks',
   flashcardStringFilter: null,
   flashcardNoteCount: 1,
