@@ -1,0 +1,6 @@
+{
+  "name": "Guitar Open Position Note Trainer",
+  "description": "Gamified interactive trainer to master guitar open-position notes on musical staff and fretboard with audio synthesis, streak tracking, and flashcards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
