@@ -8,6 +8,7 @@ import { ReferenceChart } from './components/ReferenceChart';
 import { BassNoteExercise } from './components/BassNoteExercise';
 import { MasteryStats } from './components/MasteryStats';
 import { MemoryTricksMode } from './components/MemoryTricksMode';
+import { AppLogo } from './components/AppLogo';
 import { soundManager } from './utils/audio';
 import {
   loadStoredStats,
@@ -236,9 +237,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-400 flex items-center justify-center text-stone-950 shadow-sm ring-2 ring-amber-500/20">
-              <Guitar className="w-5 h-5" />
-            </div>
+            <AppLogo size={42} />
             <div>
               <h1 className="text-base sm:text-lg font-black tracking-tight flex items-center gap-2">
                 <span>Guitar Note Trainer</span>

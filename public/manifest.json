@@ -1,0 +1,22 @@
+{
+  "name": "Guitar Note Trainer - Open Position",
+  "short_name": "Guitar Notes",
+  "description": "Master guitar open position notes on musical staff and fretboard.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0c0a09",
+  "theme_color": "#f59e0b",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
