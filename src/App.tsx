@@ -7,6 +7,7 @@ import { FretboardFindMode } from './components/FretboardFindMode';
 import { ReferenceChart } from './components/ReferenceChart';
 import { BassNoteExercise } from './components/BassNoteExercise';
 import { MasteryStats } from './components/MasteryStats';
+import { MemoryTricksMode } from './components/MemoryTricksMode';
 import { soundManager } from './utils/audio';
 import { 
   Zap, 
@@ -19,6 +20,7 @@ import {
   VolumeX, 
   Guitar,
   Sparkles,
+  Lightbulb,
   Info
 } from 'lucide-react';
 
@@ -154,6 +156,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 overflow-x-auto scrollbar-none">
           <nav className="flex space-x-1 border-t border-stone-100 dark:border-stone-800/80 py-1.5">
             {[
+              { id: 'memory-tricks', label: 'Memory Tricks', icon: Lightbulb, badge: 'Tips & Hacks' },
               { id: 'flashcards', label: 'Flashcards', icon: Zap, badge: 'Rapid Recall' },
               { id: 'arcade', label: 'Arcade Rush', icon: Flame, badge: 'Timed Game' },
               { id: 'fretboard-finder', label: 'Fretboard Pluck', icon: Crosshair },
@@ -197,6 +200,8 @@ export default function App() {
 
       {/* Main App Content View Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {activeTab === 'memory-tricks' && <MemoryTricksMode />}
+
         {activeTab === 'flashcards' && (
           <FlashcardMode stats={stats} onUpdateStats={handleUpdateStats} />
         )}

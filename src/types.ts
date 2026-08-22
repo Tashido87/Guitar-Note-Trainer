@@ -38,7 +38,8 @@ export type TrainingMode =
   | 'arcade' 
   | 'fretboard-finder' 
   | 'reference-chart' 
-  | 'bass-exercise';
+  | 'bass-exercise'
+  | 'memory-tricks';
 
 export type InputMode = 'note-name' | 'fretboard-click' | 'both';
 

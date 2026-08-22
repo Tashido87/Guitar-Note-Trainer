@@ -261,9 +261,16 @@ export const FlashcardMode: React.FC<FlashcardModeProps> = ({
           </div>
 
           {showHint && (
-            <div className="w-full mt-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-900 dark:text-amber-200 animate-in fade-in duration-200">
+            <div className="w-full mt-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-900 dark:text-amber-200 animate-in fade-in duration-200 space-y-1">
               <p>💡 <strong>Position:</strong> {currentNote.staffDescription}</p>
-              <p className="mt-0.5 text-amber-800 dark:text-amber-300"><strong>Guitar Fret:</strong> String {currentNote.stringNumber}, Fret {currentNote.fret} {currentNote.fret === 0 ? '(Open string)' : `(Finger ${currentNote.finger})`}</p>
+              {currentNote.mnemonicHint && (
+                <p className="text-amber-700 dark:text-amber-300 font-medium">
+                  <strong>Memory Trick:</strong> {currentNote.mnemonicHint}
+                </p>
+              )}
+              <p className="text-amber-800 dark:text-amber-400">
+                <strong>Guitar Fret:</strong> String {currentNote.stringNumber}, Fret {currentNote.fret} {currentNote.fret === 0 ? '(Open string)' : `(Finger ${currentNote.finger})`}
+              </p>
             </div>
           )}
         </div>
