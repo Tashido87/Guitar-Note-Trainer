@@ -188,6 +188,10 @@ export default function App() {
     setPreferences(prev => ({ ...prev, flashcardStringFilter: filter }));
   };
 
+  const handleFlashcardNoteCountChange = (count: 1 | 2 | 4) => {
+    setPreferences(prev => ({ ...prev, flashcardNoteCount: count }));
+  };
+
   const handleBassBpmChange = (bpm: number) => {
     setPreferences(prev => ({ ...prev, bassExerciseBpm: bpm }));
   };
@@ -328,6 +332,8 @@ export default function App() {
             onUpdateSessionBest={handleUpdateSessionBest}
             initialStringFilter={preferences.flashcardStringFilter}
             onFilterChange={handleFlashcardFilterChange}
+            initialNoteCount={preferences.flashcardNoteCount || 1}
+            onNoteCountChange={handleFlashcardNoteCountChange}
           />
         )}
 

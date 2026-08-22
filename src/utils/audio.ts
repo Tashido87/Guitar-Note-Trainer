@@ -110,6 +110,20 @@ class GuitarAudioSynthesizer {
   }
 
   /**
+   * Play a sequence of guitar notes in rhythm
+   */
+  public playGuitarSequence(frequencies: number[], intervalMs: number = 320) {
+    if (this.isMuted || frequencies.length === 0) return;
+    frequencies.forEach((freq, idx) => {
+      setTimeout(() => {
+        if (!this.isMuted) {
+          this.playGuitarNote(freq, 1.8);
+        }
+      }, idx * intervalMs);
+    });
+  }
+
+  /**
    * Sound effect for correct answer
    */
   public playCorrectSound() {

@@ -55,6 +55,7 @@ export interface UserPreferences {
   isMuted: boolean;
   lastTab: TrainingMode | 'mastery';
   flashcardStringFilter: number | null;
+  flashcardNoteCount: 1 | 2 | 4;
   bassExerciseBpm: number;
 }
 
@@ -62,6 +63,7 @@ export const DEFAULT_USER_PREFS: UserPreferences = {
   isMuted: false,
   lastTab: 'memory-tricks',
   flashcardStringFilter: null,
+  flashcardNoteCount: 1,
   bassExerciseBpm: 76,
 };
 

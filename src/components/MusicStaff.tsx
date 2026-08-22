@@ -1,35 +1,50 @@
 import React from 'react';
 import { GuitarNote } from '../types';
 import { soundManager } from '../utils/audio';
-import { Volume2 } from 'lucide-react';
+import { Volume2, Play } from 'lucide-react';
 
 interface MusicStaffProps {
-  note: GuitarNote | null;
+  note?: GuitarNote | null;
+  notes?: GuitarNote[];
+  activeNoteIndex?: number;
+  noteFeedbacks?: ('idle' | 'correct' | 'wrong')[];
   showHelperLabels?: boolean;
   showNoteName?: boolean;
   showStringFretBadge?: boolean;
   feedbackState?: 'correct' | 'wrong' | 'idle';
   interactive?: boolean;
   onStaffClick?: () => void;
+  onNoteClick?: (note: GuitarNote, index: number) => void;
   width?: number;
   height?: number;
   className?: string;
   subTitle?: string;
+  timeSignature?: '2/4' | '4/4';
 }
 
 export const MusicStaff: React.FC<MusicStaffProps> = ({
   note,
+  notes,
+  activeNoteIndex,
+  noteFeedbacks,
   showHelperLabels = false,
   showNoteName = false,
   showStringFretBadge = false,
   feedbackState = 'idle',
   interactive = true,
   onStaffClick,
-  width = 380,
+  onNoteClick,
+  width = 440,
   height = 230,
   className = '',
   subTitle,
+  timeSignature,
 }) => {
+  // Normalize notes list
+  const notesList: GuitarNote[] = notes && notes.length > 0 
+    ? notes 
+    : (note ? [note] : []);
+
   // Staff geometry
   // 5 lines: lines at y = 70, 86, 102, 118, 134 (top line 5 at y=70, bottom line 1 at y=134)
   const lineSpacing = 16;
@@ -42,43 +57,47 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
   // Each step is lineSpacing / 2 = 8px
   // Note Y = staffBottomY - (step * (lineSpacing / 2))
   const stepSize = lineSpacing / 2;
-  const noteX = width / 2;
-  const noteY = note ? staffBottomY - note.staffYStep * stepSize : 0;
-
-  // Stem calculation: if step >= 4 (B4 middle line or above), stem goes down from left of head.
-  // If step < 4, stem goes up from right of head.
-  const stemDirection = note && note.staffYStep >= 4 ? 'down' : 'up';
-  const stemLength = 36;
   const noteRadiusX = 8.5;
   const noteRadiusY = 6.2;
+  const stemLength = 36;
 
-  // Ledger lines logic
-  // For notes below staff:
-  // Step -2 (C4): 1 ledger line at y = staffBottomY + 1 * lineSpacing (150)
-  // Step -3 (B3): 1 ledger line at y = 150 (note hangs below it)
-  // Step -4 (A3): 2 ledger lines at y = 150, 166
-  // Step -5 (G3): 2 ledger lines at y = 150, 166 (note hangs below 2nd)
-  // Step -6 (F3): 3 ledger lines at y = 150, 166, 182
-  // Step -7 (E3): 3 ledger lines at y = 150, 166, 182 (note hangs below 3rd)
-  const ledgerLines: number[] = [];
-  if (note) {
-    if (note.staffYStep <= -2) {
-      ledgerLines.push(staffBottomY + lineSpacing); // 1st ledger line below
+  // Calculate note positions
+  const getNoteX = (index: number, total: number) => {
+    if (total <= 1) {
+      return width / 2 + 10;
     }
-    if (note.staffYStep <= -4) {
-      ledgerLines.push(staffBottomY + 2 * lineSpacing); // 2nd ledger line below
+    if (total === 2) {
+      const startX = staffLeft + 115;
+      const endX = staffRight - 65;
+      return startX + index * (endX - startX);
     }
-    if (note.staffYStep <= -6) {
-      ledgerLines.push(staffBottomY + 3 * lineSpacing); // 3rd ledger line below
-    }
-  }
+    // 4 notes (or other count)
+    const clefOffset = (timeSignature || total >= 2) ? 100 : 80;
+    const startX = staffLeft + clefOffset;
+    const availableWidth = staffRight - startX - 35;
+    const step = availableWidth / (total - 1);
+    return startX + index * step;
+  };
 
-  const handlePlaySound = () => {
-    if (note) {
-      soundManager.playGuitarNote(note.frequency);
+  // Determine time signature to display if not explicitly provided
+  const derivedTimeSignature = timeSignature || (notesList.length === 2 ? '2/4' : notesList.length === 4 ? '4/4' : undefined);
+
+  const handleGlobalStaffClick = () => {
+    if (notesList.length === 1) {
+      soundManager.playGuitarNote(notesList[0].frequency);
+    } else if (notesList.length > 1) {
+      soundManager.playGuitarSequence(notesList.map(n => n.frequency));
     }
     if (onStaffClick) {
       onStaffClick();
+    }
+  };
+
+  const handleSingleNoteClick = (e: React.MouseEvent, n: GuitarNote, idx: number) => {
+    e.stopPropagation();
+    soundManager.playGuitarNote(n.frequency);
+    if (onNoteClick) {
+      onNoteClick(n, idx);
     }
   };
 
@@ -90,23 +109,32 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
 
   return (
     <div
-      id={`music-staff-card-${note?.id || 'empty'}`}
-      onClick={interactive ? handlePlaySound : undefined}
+      id={`music-staff-card-${notesList.map(n => n.id).join('-') || 'empty'}`}
+      onClick={interactive ? handleGlobalStaffClick : undefined}
       className={`relative flex flex-col items-center rounded-2xl border shadow-sm transition-all duration-200 select-none ${getBorderColor()} ${
         interactive ? 'cursor-pointer hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700' : ''
       } ${className}`}
     >
       {/* Audio hint indicator */}
-      {interactive && note && (
+      {interactive && notesList.length > 0 && (
         <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800/80 rounded-full hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
-          <Volume2 className="w-3.5 h-3.5" />
-          <span>Click to hear</span>
+          {notesList.length > 1 ? (
+            <>
+              <Play className="w-3 h-3 fill-current" />
+              <span>Play Sequence</span>
+            </>
+          ) : (
+            <>
+              <Volume2 className="w-3.5 h-3.5" />
+              <span>Click to hear</span>
+            </>
+          )}
         </div>
       )}
 
       {subTitle && (
-        <div className="absolute top-3 left-4 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-          {subTitle}
+        <div className="absolute top-3 left-4 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+          <span>{subTitle}</span>
         </div>
       )}
 
@@ -115,8 +143,8 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
         width={width}
         height={height}
         viewBox={`0 0 ${width} ${height}`}
-        className="overflow-visible"
-        aria-label={note ? `Musical staff displaying note ${note.name}` : 'Empty musical staff'}
+        className="overflow-visible w-full max-w-full"
+        aria-label="Musical staff displaying guitar notes"
       >
         {/* 5 Staff Lines */}
         {[0, 1, 2, 3, 4].map((i) => {
@@ -133,7 +161,7 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
                 strokeWidth="1.6"
                 shapeRendering="geometricPrecision"
               />
-              {/* Optional helper text on left */}
+              {/* Helper text on left */}
               {showHelperLabels && (
                 <text
                   x={staffLeft - 8}
@@ -159,6 +187,42 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
           strokeWidth="2"
         />
 
+        {/* Treble Clef symbol */}
+        <text
+          x={staffLeft + 6}
+          y={staffBottomY - 6}
+          className="fill-zinc-800 dark:fill-zinc-200 select-none pointer-events-none font-serif text-[56px]"
+          textAnchor="start"
+        >
+          𝄞
+        </text>
+
+        {/* Time signature (2/4 or 4/4) */}
+        {derivedTimeSignature && (
+          <g className="fill-zinc-800 dark:fill-zinc-200 font-bold select-none pointer-events-none text-center">
+            <text
+              x={staffLeft + 52}
+              y={staffTopY + 20}
+              fontSize="20"
+              fontWeight="900"
+              fontFamily="sans-serif"
+              textAnchor="middle"
+            >
+              {derivedTimeSignature.split('/')[0]}
+            </text>
+            <text
+              x={staffLeft + 52}
+              y={staffTopY + 52}
+              fontSize="20"
+              fontWeight="900"
+              fontFamily="sans-serif"
+              textAnchor="middle"
+            >
+              {derivedTimeSignature.split('/')[1]}
+            </text>
+          </g>
+        )}
+
         {/* End double barline */}
         <line
           x1={staffRight - 4}
@@ -179,90 +243,168 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
           strokeWidth="3.5"
         />
 
-        {/* Ledger Lines for this Note */}
-        {ledgerLines.map((ly, idx) => (
-          <line
-            key={`ledger-${idx}`}
-            x1={noteX - 16}
-            y1={ly}
-            x2={noteX + 16}
-            y2={ly}
-            stroke="currentColor"
-            className="text-zinc-700 dark:text-zinc-300"
-            strokeWidth="1.8"
-            shapeRendering="geometricPrecision"
-          />
-        ))}
+        {/* Render Each Note in NotesList */}
+        {notesList.map((n, idx) => {
+          const noteX = getNoteX(idx, notesList.length);
+          const noteY = staffBottomY - n.staffYStep * stepSize;
+          const stemDirection = n.staffYStep >= 4 ? 'down' : 'up';
 
-        {/* The Musical Note */}
-        {note && (
-          <g>
-            {/* Note Head: rotated ellipse */}
-            <ellipse
-              cx={noteX}
-              cy={noteY}
-              rx={noteRadiusX}
-              ry={noteRadiusY}
-              transform={`rotate(-22 ${noteX} ${noteY})`}
-              className={`${
-                feedbackState === 'correct'
-                  ? 'fill-emerald-600 dark:fill-emerald-400'
-                  : feedbackState === 'wrong'
-                  ? 'fill-rose-600 dark:fill-rose-400'
-                  : 'fill-zinc-900 dark:fill-zinc-100'
-              } transition-colors duration-200`}
-            />
+          // Specific note feedback
+          const itemFeedback = noteFeedbacks && noteFeedbacks[idx] !== undefined
+            ? noteFeedbacks[idx]
+            : feedbackState;
 
-            {/* Note Stem */}
-            {stemDirection === 'up' ? (
-              <line
-                x1={noteX + noteRadiusX - 1.5}
-                y1={noteY - 2}
-                x2={noteX + noteRadiusX - 1.5}
-                y2={noteY - stemLength}
-                stroke="currentColor"
-                className={`${
-                  feedbackState === 'correct'
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : feedbackState === 'wrong'
-                    ? 'text-rose-600 dark:text-rose-400'
-                    : 'text-zinc-900 dark:text-zinc-100'
-                } transition-colors duration-200`}
-                strokeWidth="2.2"
-                strokeLinecap="round"
+          const isActive = activeNoteIndex === idx;
+
+          // Ledger lines logic for this note
+          const ledgerLines: number[] = [];
+          if (n.staffYStep <= -2) {
+            ledgerLines.push(staffBottomY + lineSpacing); // 1st ledger line below
+          }
+          if (n.staffYStep <= -4) {
+            ledgerLines.push(staffBottomY + 2 * lineSpacing); // 2nd ledger line below
+          }
+          if (n.staffYStep <= -6) {
+            ledgerLines.push(staffBottomY + 3 * lineSpacing); // 3rd ledger line below
+          }
+
+          // Fill and stroke colors
+          let noteColorClass = 'fill-zinc-900 dark:fill-zinc-100 text-zinc-900 dark:text-zinc-100';
+          if (itemFeedback === 'correct') {
+            noteColorClass = 'fill-emerald-600 dark:fill-emerald-400 text-emerald-600 dark:text-emerald-400';
+          } else if (itemFeedback === 'wrong') {
+            noteColorClass = 'fill-rose-600 dark:fill-rose-400 text-rose-600 dark:text-rose-400';
+          } else if (isActive) {
+            noteColorClass = 'fill-blue-900 dark:fill-sky-300 text-blue-900 dark:text-sky-300';
+          }
+
+          return (
+            <g 
+              key={`note-${n.id}-${idx}`}
+              onClick={(e) => interactive && handleSingleNoteClick(e, n, idx)}
+              className={interactive ? 'cursor-pointer' : ''}
+            >
+              {/* Active Note Target Glow & Indicator */}
+              {isActive && (
+                <g>
+                  {/* Subtle high-contrast target ring */}
+                  <ellipse
+                    cx={noteX}
+                    cy={noteY}
+                    rx={noteRadiusX + 7}
+                    ry={noteRadiusY + 7}
+                    className="fill-blue-600/10 stroke-blue-700 dark:stroke-sky-400 stroke-2"
+                  />
+                  {/* Active step number pointer above staff */}
+                  <g transform={`translate(${noteX}, ${staffTopY - 26})`}>
+                    <rect
+                      x="-11"
+                      y="0"
+                      width="22"
+                      height="16"
+                      rx="4"
+                      className="fill-blue-800 dark:fill-sky-500"
+                    />
+                    <text
+                      x="0"
+                      y="12"
+                      textAnchor="middle"
+                      className="fill-white font-bold text-[10px]"
+                    >
+                      {idx + 1}
+                    </text>
+                    <polygon
+                      points="-4,16 4,16 0,20"
+                      className="fill-blue-800 dark:fill-sky-500"
+                    />
+                  </g>
+                </g>
+              )}
+
+              {/* Ledger Lines for this Note */}
+              {ledgerLines.map((ly, lIdx) => (
+                <line
+                  key={`ledger-${idx}-${lIdx}`}
+                  x1={noteX - 16}
+                  y1={ly}
+                  x2={noteX + 16}
+                  y2={ly}
+                  stroke="currentColor"
+                  className="text-zinc-700 dark:text-zinc-300"
+                  strokeWidth="1.8"
+                  shapeRendering="geometricPrecision"
+                />
+              ))}
+
+              {/* Note Head: rotated ellipse */}
+              <ellipse
+                cx={noteX}
+                cy={noteY}
+                rx={noteRadiusX}
+                ry={noteRadiusY}
+                transform={`rotate(-22 ${noteX} ${noteY})`}
+                className={`${noteColorClass} transition-colors duration-200`}
               />
-            ) : (
-              <line
-                x1={noteX - noteRadiusX + 1.5}
-                y1={noteY + 2}
-                x2={noteX - noteRadiusX + 1.5}
-                y2={noteY + stemLength}
-                stroke="currentColor"
-                className={`${
-                  feedbackState === 'correct'
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : feedbackState === 'wrong'
-                    ? 'text-rose-600 dark:text-rose-400'
-                    : 'text-zinc-900 dark:text-zinc-100'
-                } transition-colors duration-200`}
-                strokeWidth="2.2"
-                strokeLinecap="round"
-              />
-            )}
-          </g>
-        )}
+
+              {/* Note Stem */}
+              {stemDirection === 'up' ? (
+                <line
+                  x1={noteX + noteRadiusX - 1.5}
+                  y1={noteY - 2}
+                  x2={noteX + noteRadiusX - 1.5}
+                  y2={noteY - stemLength}
+                  stroke="currentColor"
+                  className={`${noteColorClass} transition-colors duration-200`}
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                />
+              ) : (
+                <line
+                  x1={noteX - noteRadiusX + 1.5}
+                  y1={noteY + 2}
+                  x2={noteX - noteRadiusX + 1.5}
+                  y2={noteY + stemLength}
+                  stroke="currentColor"
+                  className={`${noteColorClass} transition-colors duration-200`}
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                />
+              )}
+
+              {/* Note Index label under note for multi-note cards */}
+              {notesList.length > 1 && (
+                <text
+                  x={noteX}
+                  y={staffBottomY + 36}
+                  textAnchor="middle"
+                  className={`text-[11px] font-mono font-bold select-none ${
+                    isActive
+                      ? 'fill-blue-800 dark:fill-sky-400 font-black text-xs'
+                      : itemFeedback === 'correct'
+                      ? 'fill-emerald-600 dark:fill-emerald-400'
+                      : itemFeedback === 'wrong'
+                      ? 'fill-rose-600 dark:fill-rose-400'
+                      : 'fill-zinc-400 dark:fill-zinc-500'
+                  }`}
+                >
+                  #{idx + 1}
+                </text>
+              )}
+            </g>
+          );
+        })}
       </svg>
 
-      {/* Optional Note Name & Guitar Info Card Footer */}
-      {(showNoteName || showStringFretBadge) && note && (
+      {/* Optional Note Name & Guitar Info Card Footer (Single note view) */}
+      {(showNoteName || showStringFretBadge) && notesList.length === 1 && (
         <div className="w-full px-4 pb-3.5 pt-1 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between gap-2 mt-auto">
           {showNoteName && (
             <div className="flex items-baseline gap-1.5">
               <span className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-                {note.name}
+                {notesList[0].name}
               </span>
               <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500">
-                (Octave {note.octave})
+                (Octave {notesList[0].octave})
               </span>
             </div>
           )}
@@ -270,10 +412,10 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
           {showStringFretBadge && (
             <div className="flex items-center gap-2 text-xs">
               <span className="px-2 py-0.5 rounded-md font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
-                String {note.stringNumber}
+                String {notesList[0].stringNumber}
               </span>
               <span className="px-2 py-0.5 rounded-md font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                Fret {note.fret} {note.fret === 0 ? '(Open)' : `(Finger ${note.finger})`}
+                Fret {notesList[0].fret} {notesList[0].fret === 0 ? '(Open)' : `(Finger ${notesList[0].finger})`}
               </span>
             </div>
           )}
