@@ -48,7 +48,29 @@ export interface GameStats {
   correctAnswered: number;
   currentStreak: number;
   bestStreak: number;
+  dailyStreak?: number;
+  lastPracticeDate?: string;
   highScore: number;
-  noteAccuracy: Record<string, { correct: number; total: number }>;
+  survivalHighScore?: number;
+  flashcardSessionBest?: number;
+  fretboardSessionBest?: number;
+  totalPracticeSeconds?: number;
+  noteAccuracy: Record<string, { 
+    correct: number; 
+    total: number;
+    fastestMs?: number;
+    totalMs?: number;
+  }>;
   stringMastery: Record<number, number>; // 1-6 string -> percent
+  recentSessions?: {
+    id: string;
+    timestamp: number;
+    mode: string;
+    totalQuestions: number;
+    correctAnswers: number;
+    accuracy: number;
+    streak: number;
+    score?: number;
+  }[];
+  dailyHistory?: Record<string, { date: string; drills: number; correct: number }>;
 }

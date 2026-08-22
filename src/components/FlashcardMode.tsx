@@ -18,21 +18,27 @@ import {
 
 interface FlashcardModeProps {
   stats: GameStats;
-  onUpdateStats: (isCorrect: boolean, noteId: string, stringNum: number) => void;
+  onUpdateStats: (isCorrect: boolean, noteId: string, stringNum: number, reactionMs?: number) => void;
+  onUpdateSessionBest?: (mode: 'flashcards', streak: number) => void;
+  initialStringFilter?: number | null;
+  onFilterChange?: (filter: number | null) => void;
 }
 
 export const FlashcardMode: React.FC<FlashcardModeProps> = ({
   stats,
   onUpdateStats,
+  onUpdateSessionBest,
+  initialStringFilter = null,
+  onFilterChange,
 }) => {
-  const [activeStringFilter, setActiveStringFilter] = useState<number | null>(null);
+  const [activeStringFilter, setActiveStringFilter] = useState<number | null>(initialStringFilter);
   const [currentNote, setCurrentNote] = useState<GuitarNote>(GUITAR_OPEN_NOTES[0]);
   const [showHint, setShowHint] = useState(false);
   const [feedback, setFeedback] = useState<'idle' | 'correct' | 'wrong'>('idle');
   const [selectedGuess, setSelectedGuess] = useState<string | null>(null);
   const [reactionTime, setReactionTime] = useState<number | null>(null);
   const [sessionStreak, setSessionStreak] = useState(0);
-  const [sessionBestStreak, setSessionBestStreak] = useState(0);
+  const [sessionBestStreak, setSessionBestStreak] = useState(() => stats.flashcardSessionBest || 0);
   const [history, setHistory] = useState<{ note: GuitarNote; correct: boolean; timeMs: number }[]>([]);
 
   const startTimeRef = useRef<number>(Date.now());
@@ -87,6 +93,9 @@ export const FlashcardMode: React.FC<FlashcardModeProps> = ({
       setSessionStreak(newStreak);
       if (newStreak > sessionBestStreak) {
         setSessionBestStreak(newStreak);
+        if (onUpdateSessionBest) {
+          onUpdateSessionBest('flashcards', newStreak);
+        }
       }
 
       if (newStreak > 0 && newStreak % 10 === 0) {
@@ -97,7 +106,7 @@ export const FlashcardMode: React.FC<FlashcardModeProps> = ({
         });
       }
 
-      onUpdateStats(true, currentNote.id, currentNote.stringNumber);
+      onUpdateStats(true, currentNote.id, currentNote.stringNumber, timeSpent);
       setHistory(prev => [{ note: currentNote, correct: true, timeMs: timeSpent }, ...prev.slice(0, 7)]);
 
       // Auto advance on correct answer
@@ -108,10 +117,10 @@ export const FlashcardMode: React.FC<FlashcardModeProps> = ({
       setFeedback('wrong');
       soundManager.playWrongSound();
       setSessionStreak(0);
-      onUpdateStats(false, currentNote.id, currentNote.stringNumber);
+      onUpdateStats(false, currentNote.id, currentNote.stringNumber, timeSpent);
       setHistory(prev => [{ note: currentNote, correct: false, timeMs: timeSpent }, ...prev.slice(0, 7)]);
     }
-  }, [currentNote, nextRandomNote, onUpdateStats, sessionBestStreak, sessionStreak]);
+  }, [currentNote, nextRandomNote, onUpdateSessionBest, onUpdateStats, sessionBestStreak, sessionStreak]);
 
   // Keyboard shortcut listener for physical typing: A, B, C, D, E, F, G
   useEffect(() => {
@@ -138,6 +147,13 @@ export const FlashcardMode: React.FC<FlashcardModeProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleGuess, feedback, nextRandomNote]);
+
+  const handleFilterSelect = (filterVal: number | null) => {
+    setActiveStringFilter(filterVal);
+    if (onFilterChange) {
+      onFilterChange(filterVal);
+    }
+  };
 
   const noteButtons: ('A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G')[] = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 
@@ -186,7 +202,7 @@ export const FlashcardMode: React.FC<FlashcardModeProps> = ({
           <Filter className="w-3.5 h-3.5" /> Filter:
         </span>
         <button
-          onClick={() => setActiveStringFilter(null)}
+          onClick={() => handleFilterSelect(null)}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
             activeStringFilter === null
               ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-sm'
@@ -205,7 +221,7 @@ export const FlashcardMode: React.FC<FlashcardModeProps> = ({
         ].map((s) => (
           <button
             key={s.num}
-            onClick={() => setActiveStringFilter(s.num)}
+            onClick={() => handleFilterSelect(s.num)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
               activeStringFilter === s.num
                 ? 'bg-amber-500 text-zinc-950 font-bold shadow-sm'

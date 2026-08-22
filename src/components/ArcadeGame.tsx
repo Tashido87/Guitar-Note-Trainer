@@ -19,13 +19,22 @@ import {
 interface ArcadeGameProps {
   stats: GameStats;
   onUpdateStats: (isCorrect: boolean, noteId: string, stringNum: number) => void;
-  onUpdateHighScore: (score: number) => void;
+  onUpdateHighScore: (score: number, mode?: 'timed' | 'survival') => void;
+  onLogSession?: (session: {
+    mode: string;
+    totalQuestions: number;
+    correctAnswers: number;
+    accuracy: number;
+    streak: number;
+    score: number;
+  }) => void;
 }
 
 export const ArcadeGame: React.FC<ArcadeGameProps> = ({
   stats,
   onUpdateStats,
   onUpdateHighScore,
+  onLogSession,
 }) => {
   const [gameState, setGameState] = useState<'idle' | 'playing' | 'gameover'>('idle');
   const [gameMode, setGameMode] = useState<'timed' | 'survival'>('timed');
@@ -33,6 +42,9 @@ export const ArcadeGame: React.FC<ArcadeGameProps> = ({
   const [lives, setLives] = useState<number>(3);
   const [score, setScore] = useState<number>(0);
   const [combo, setCombo] = useState<number>(0);
+  const [maxComboInRound, setMaxComboInRound] = useState<number>(0);
+  const [roundTotal, setRoundTotal] = useState<number>(0);
+  const [roundCorrect, setRoundCorrect] = useState<number>(0);
   const [currentNote, setCurrentNote] = useState<GuitarNote>(GUITAR_OPEN_NOTES[0]);
   const [feedback, setFeedback] = useState<'idle' | 'correct' | 'wrong'>('idle');
   const [selectedGuess, setSelectedGuess] = useState<string | null>(null);
@@ -59,6 +71,9 @@ export const ArcadeGame: React.FC<ArcadeGameProps> = ({
     setGameState('playing');
     setScore(0);
     setCombo(0);
+    setMaxComboInRound(0);
+    setRoundTotal(0);
+    setRoundCorrect(0);
     setLives(3);
     setTimeLeft(60);
     setFeedback('idle');
@@ -89,28 +104,46 @@ export const ArcadeGame: React.FC<ArcadeGameProps> = ({
     };
   }, [gameState, gameMode]);
 
-  // Handle Game Over score check
+  // Handle Game Over score check and session logging
+  const currentBestForMode = gameMode === 'timed' 
+    ? stats.highScore 
+    : (stats.survivalHighScore || 0);
+
   useEffect(() => {
     if (gameState === 'gameover') {
-      if (score > stats.highScore) {
-        onUpdateHighScore(score);
+      if (score > currentBestForMode) {
+        onUpdateHighScore(score, gameMode);
         confetti({
           particleCount: 100,
           spread: 80,
           origin: { y: 0.6 },
         });
       }
+
+      if (roundTotal > 0 && onLogSession) {
+        const accuracy = Math.round((roundCorrect / roundTotal) * 100);
+        onLogSession({
+          mode: gameMode === 'timed' ? 'Arcade (Timed)' : 'Arcade (Survival)',
+          totalQuestions: roundTotal,
+          correctAnswers: roundCorrect,
+          accuracy,
+          streak: maxComboInRound,
+          score,
+        });
+      }
     }
-  }, [gameState, score, stats.highScore, onUpdateHighScore]);
+  }, [gameState]);
 
   const handleGuess = useCallback((letter: string) => {
     if (gameState !== 'playing' || isAnsweredRef.current) return;
     isAnsweredRef.current = true;
     setSelectedGuess(letter);
 
+    setRoundTotal(t => t + 1);
     const isCorrect = letter === currentNote.name;
 
     if (isCorrect) {
+      setRoundCorrect(c => c + 1);
       setFeedback('correct');
       soundManager.playCorrectSound();
       soundManager.playGuitarNote(currentNote.frequency);
@@ -119,6 +152,7 @@ export const ArcadeGame: React.FC<ArcadeGameProps> = ({
       setScore((s) => s + pointsEarned);
       const newCombo = combo + 1;
       setCombo(newCombo);
+      setMaxComboInRound(m => Math.max(m, newCombo));
 
       if (newCombo === 3 || newCombo === 6 || newCombo === 10) {
         soundManager.playComboSound(multiplier);
@@ -190,10 +224,17 @@ export const ArcadeGame: React.FC<ArcadeGameProps> = ({
           </div>
 
           {/* High Score Preview */}
-          <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300">
-            <Trophy className="w-5 h-5 text-amber-500" />
-            <span className="text-sm font-semibold">Personal Best:</span>
-            <span className="text-lg font-black">{stats.highScore} pts</span>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs sm:text-sm">
+              <Timer className="w-4 h-4 text-amber-500" />
+              <span className="font-semibold">Time Attack Best:</span>
+              <span className="font-black">{stats.highScore || 0} pts</span>
+            </div>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs sm:text-sm">
+              <Heart className="w-4 h-4 text-rose-500" />
+              <span className="font-semibold">Survival Best:</span>
+              <span className="font-black">{stats.survivalHighScore || 0} pts</span>
+            </div>
           </div>
 
           {/* Game Mode Pickers */}

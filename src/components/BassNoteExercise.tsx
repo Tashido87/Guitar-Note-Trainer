@@ -3,11 +3,26 @@ import { CHORD_EXERCISES, GUITAR_OPEN_NOTES } from '../data/notesData';
 import { soundManager } from '../utils/audio';
 import { Play, Square, Volume2, Sparkles, Music2, Disc } from 'lucide-react';
 
-export const BassNoteExercise: React.FC = () => {
+interface BassNoteExerciseProps {
+  initialBpm?: number;
+  onBpmChange?: (bpm: number) => void;
+}
+
+export const BassNoteExercise: React.FC<BassNoteExerciseProps> = ({
+  initialBpm = 76,
+  onBpmChange,
+}) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeChordIdx, setActiveChordIdx] = useState(0);
   const [currentBeat, setCurrentBeat] = useState(1); // 1, 2, 3, 4
-  const [bpm, setBpm] = useState(76);
+  const [bpm, setBpm] = useState(initialBpm);
+
+  const handleBpmChange = (newBpm: number) => {
+    setBpm(newBpm);
+    if (onBpmChange) {
+      onBpmChange(newBpm);
+    }
+  };
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const currentChord = CHORD_EXERCISES[activeChordIdx];
@@ -102,7 +117,7 @@ export const BassNoteExercise: React.FC = () => {
               min="50"
               max="120"
               value={bpm}
-              onChange={(e) => setBpm(Number(e.target.value))}
+              onChange={(e) => handleBpmChange(Number(e.target.value))}
               className="w-20 accent-amber-500 cursor-pointer"
             />
           </div>

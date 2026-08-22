@@ -9,6 +9,17 @@ import { BassNoteExercise } from './components/BassNoteExercise';
 import { MasteryStats } from './components/MasteryStats';
 import { MemoryTricksMode } from './components/MemoryTricksMode';
 import { soundManager } from './utils/audio';
+import {
+  loadStoredStats,
+  saveStoredStats,
+  loadUserPreferences,
+  saveUserPreferences,
+  calculateUpdatedDailyStreak,
+  clearAllStoredData,
+  StoredGameStats,
+  UserPreferences,
+  INITIAL_EXTENDED_STATS,
+} from './utils/storage';
 import { 
   Zap, 
   Flame, 
@@ -21,61 +32,88 @@ import {
   Guitar,
   Sparkles,
   Lightbulb,
-  Info
+  Calendar,
+  Trophy
 } from 'lucide-react';
 
-const INITIAL_STATS: GameStats = {
-  totalAnswered: 0,
-  correctAnswered: 0,
-  currentStreak: 0,
-  bestStreak: 0,
-  highScore: 0,
-  noteAccuracy: {},
-  stringMastery: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
-};
-
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TrainingMode | 'mastery'>('flashcards');
-  const [isMuted, setIsMuted] = useState(false);
-  const [stats, setStats] = useState<GameStats>(() => {
-    try {
-      const saved = localStorage.getItem('guitar_note_trainer_stats');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // Ignore
-    }
-    return INITIAL_STATS;
-  });
+  const [preferences, setPreferences] = useState<UserPreferences>(() => loadUserPreferences());
+  const [activeTab, setActiveTab] = useState<TrainingMode | 'mastery'>(preferences.lastTab || 'memory-tricks');
+  const [isMuted, setIsMuted] = useState<boolean>(preferences.isMuted);
+  const [stats, setStats] = useState<StoredGameStats>(() => loadStoredStats());
 
-  // Persist stats to localStorage
+  // Keep audio system synchronized with initial mute state
   useEffect(() => {
-    try {
-      localStorage.setItem('guitar_note_trainer_stats', JSON.stringify(stats));
-    } catch {
-      // Ignore
-    }
+    soundManager.setMuted(preferences.isMuted);
+  }, []);
+
+  // Persist preferences when updated
+  useEffect(() => {
+    saveUserPreferences(preferences);
+  }, [preferences]);
+
+  // Persist stats to browser localStorage on any stat update
+  useEffect(() => {
+    saveStoredStats(stats);
   }, [stats]);
 
-  const handleToggleSound = () => {
-    const nextState = !isMuted;
-    setIsMuted(nextState);
-    soundManager.setMuted(nextState);
+  const handleTabChange = (tab: TrainingMode | 'mastery') => {
+    setActiveTab(tab);
+    setPreferences(prev => ({ ...prev, lastTab: tab }));
   };
 
-  const handleUpdateStats = (isCorrect: boolean, noteId: string, stringNum: number) => {
+  const handleToggleSound = () => {
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
+    soundManager.setMuted(nextMuted);
+    setPreferences(prev => ({ ...prev, isMuted: nextMuted }));
+  };
+
+  const handleUpdateStats = (
+    isCorrect: boolean, 
+    noteId: string, 
+    stringNum: number, 
+    reactionMs?: number
+  ) => {
     setStats((prev) => {
       const totalAnswered = prev.totalAnswered + 1;
       const correctAnswered = isCorrect ? prev.correctAnswered + 1 : prev.correctAnswered;
       const currentStreak = isCorrect ? prev.currentStreak + 1 : 0;
       const bestStreak = Math.max(prev.bestStreak, currentStreak);
 
-      // Note specific accuracy
+      // Daily streak calculation
+      const { dailyStreak, today } = calculateUpdatedDailyStreak(
+        prev.lastPracticeDate || '',
+        prev.dailyStreak || 0
+      );
+
+      // Daily history recording
+      const existingTodayRecord = prev.dailyHistory?.[today] || { date: today, drills: 0, correct: 0 };
+      const updatedDailyHistory = {
+        ...(prev.dailyHistory || {}),
+        [today]: {
+          date: today,
+          drills: existingTodayRecord.drills + 1,
+          correct: isCorrect ? existingTodayRecord.correct + 1 : existingTodayRecord.correct,
+        },
+      };
+
+      // Note specific accuracy & speed
       const currentNoteData = prev.noteAccuracy[noteId] || { correct: 0, total: 0 };
+      const currentTotalMs = currentNoteData.totalMs || 0;
+      const currentFastestMs = currentNoteData.fastestMs;
+      
+      const newFastestMs = reactionMs && isCorrect 
+        ? (currentFastestMs ? Math.min(currentFastestMs, reactionMs) : reactionMs)
+        : currentFastestMs;
+
       const updatedNoteAccuracy = {
         ...prev.noteAccuracy,
         [noteId]: {
           total: currentNoteData.total + 1,
           correct: isCorrect ? currentNoteData.correct + 1 : currentNoteData.correct,
+          totalMs: reactionMs ? currentTotalMs + reactionMs : currentTotalMs,
+          fastestMs: newFastestMs,
         },
       };
 
@@ -85,29 +123,98 @@ export default function App() {
         correctAnswered,
         currentStreak,
         bestStreak,
+        dailyStreak,
+        lastPracticeDate: today,
+        dailyHistory: updatedDailyHistory,
         noteAccuracy: updatedNoteAccuracy,
       };
     });
   };
 
-  const handleUpdateHighScore = (newScore: number) => {
-    setStats((prev) => ({
-      ...prev,
-      highScore: Math.max(prev.highScore, newScore),
-    }));
+  const handleUpdateHighScore = (newScore: number, mode: 'timed' | 'survival' = 'timed') => {
+    setStats((prev) => {
+      if (mode === 'survival') {
+        return {
+          ...prev,
+          survivalHighScore: Math.max(prev.survivalHighScore || 0, newScore),
+        };
+      }
+      return {
+        ...prev,
+        highScore: Math.max(prev.highScore, newScore),
+      };
+    });
+  };
+
+  const handleUpdateSessionBest = (mode: 'flashcards' | 'fretboard', streak: number) => {
+    setStats((prev) => {
+      if (mode === 'flashcards') {
+        return {
+          ...prev,
+          flashcardSessionBest: Math.max(prev.flashcardSessionBest || 0, streak),
+        };
+      } else {
+        return {
+          ...prev,
+          fretboardSessionBest: Math.max(prev.fretboardSessionBest || 0, streak),
+        };
+      }
+    });
+  };
+
+  const handleLogSession = (session: {
+    mode: string;
+    totalQuestions: number;
+    correctAnswers: number;
+    accuracy: number;
+    streak: number;
+    score?: number;
+  }) => {
+    setStats((prev) => {
+      const record = {
+        id: `sess-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        timestamp: Date.now(),
+        ...session,
+      };
+      const recentSessions = [record, ...(prev.recentSessions || []).slice(0, 19)];
+      return {
+        ...prev,
+        recentSessions,
+      };
+    });
+  };
+
+  const handleFlashcardFilterChange = (filter: number | null) => {
+    setPreferences(prev => ({ ...prev, flashcardStringFilter: filter }));
+  };
+
+  const handleBassBpmChange = (bpm: number) => {
+    setPreferences(prev => ({ ...prev, bassExerciseBpm: bpm }));
   };
 
   const handleResetStats = () => {
-    if (window.confirm('Reset all your training progress and accuracy records?')) {
-      setStats(INITIAL_STATS);
-      localStorage.removeItem('guitar_note_trainer_stats');
+    if (window.confirm('Are you sure you want to reset all your training streaks, high scores, and accuracy data? This cannot be undone.')) {
+      clearAllStoredData();
+      setStats(INITIAL_EXTENDED_STATS);
+      setPreferences(prev => ({ ...prev, flashcardStringFilter: null }));
+    }
+  };
+
+  const handleImportData = (importedStats: StoredGameStats, importedPrefs?: UserPreferences) => {
+    setStats(importedStats);
+    saveStoredStats(importedStats);
+    if (importedPrefs) {
+      setPreferences(importedPrefs);
+      saveUserPreferences(importedPrefs);
+      setIsMuted(importedPrefs.isMuted);
+      soundManager.setMuted(importedPrefs.isMuted);
     }
   };
 
   return (
     <div className="min-h-screen bg-stone-100 dark:bg-stone-950 text-stone-900 dark:text-stone-100 flex flex-col font-sans selection:bg-amber-500 selection:text-black">
       {/* Top Main Navigation Header */}
-      <header className="sticky top-0 z-50 backdrop-blur-md bg-white/85 dark:bg-stone-900/85 border-b border-stone-200 dark:border-stone-800 shadow-xs">
+      <header className="sticky top-0 z-50 backdrop-blur-md bg-white/90 dark:bg-stone-900/90 border-b border-stone-200 dark:border-stone-800 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3">
@@ -127,12 +234,24 @@ export default function App() {
             </div>
           </div>
 
-          {/* Right Action Tools (Sound toggle, Quick Stats) */}
+          {/* Right Action Tools (Daily Streak, Active Streak, Sound toggle) */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Quick Streak Pill */}
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-bold text-amber-700 dark:text-amber-400">
-              <span>🔥 Streak:</span>
-              <span className="font-extrabold">{stats.currentStreak}</span>
+            {/* Daily Streak Indicator */}
+            <div 
+              className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-sky-500/10 border border-sky-500/20 text-xs font-bold text-sky-700 dark:text-sky-400"
+              title="Consecutive daily practice streak"
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>{stats.dailyStreak || 0}d</span>
+            </div>
+
+            {/* Quick Drill Streak Pill */}
+            <div 
+              className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-bold text-amber-700 dark:text-amber-400"
+              title="Current correct answer drill streak"
+            >
+              <Flame className="w-3.5 h-3.5 text-amber-500" />
+              <span>{stats.currentStreak}</span>
             </div>
 
             {/* Audio Mute/Unmute */}
@@ -162,7 +281,7 @@ export default function App() {
               { id: 'fretboard-finder', label: 'Fretboard Pluck', icon: Crosshair },
               { id: 'reference-chart', label: 'Summary Chart', icon: BookOpen, badge: 'Book Pg 1' },
               { id: 'bass-exercise', label: 'Pick-Strum Song', icon: Music, badge: 'Ex 18' },
-              { id: 'mastery', label: 'My Progress', icon: BarChart3 },
+              { id: 'mastery', label: 'My Progress', icon: BarChart3, badge: 'Saved' },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -171,7 +290,7 @@ export default function App() {
                 <button
                   key={tab.id}
                   id={`nav-tab-${tab.id}`}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => handleTabChange(tab.id as any)}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
                     isActive
                       ? 'bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 shadow-sm'
@@ -203,7 +322,13 @@ export default function App() {
         {activeTab === 'memory-tricks' && <MemoryTricksMode />}
 
         {activeTab === 'flashcards' && (
-          <FlashcardMode stats={stats} onUpdateStats={handleUpdateStats} />
+          <FlashcardMode 
+            stats={stats} 
+            onUpdateStats={handleUpdateStats}
+            onUpdateSessionBest={handleUpdateSessionBest}
+            initialStringFilter={preferences.flashcardStringFilter}
+            onFilterChange={handleFlashcardFilterChange}
+          />
         )}
 
         {activeTab === 'arcade' && (
@@ -211,19 +336,34 @@ export default function App() {
             stats={stats}
             onUpdateStats={handleUpdateStats}
             onUpdateHighScore={handleUpdateHighScore}
+            onLogSession={handleLogSession}
           />
         )}
 
         {activeTab === 'fretboard-finder' && (
-          <FretboardFindMode stats={stats} onUpdateStats={handleUpdateStats} />
+          <FretboardFindMode 
+            stats={stats} 
+            onUpdateStats={handleUpdateStats} 
+            onUpdateSessionBest={handleUpdateSessionBest}
+          />
         )}
 
         {activeTab === 'reference-chart' && <ReferenceChart />}
 
-        {activeTab === 'bass-exercise' && <BassNoteExercise />}
+        {activeTab === 'bass-exercise' && (
+          <BassNoteExercise 
+            initialBpm={preferences.bassExerciseBpm}
+            onBpmChange={handleBassBpmChange}
+          />
+        )}
 
         {activeTab === 'mastery' && (
-          <MasteryStats stats={stats} onResetStats={handleResetStats} />
+          <MasteryStats 
+            stats={stats} 
+            preferences={preferences}
+            onResetStats={handleResetStats}
+            onImportData={handleImportData}
+          />
         )}
       </main>
 
@@ -234,7 +374,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             <span>Standard Treble Clef (8vb)</span>
             <span>•</span>
-            <span>Real Acoustic Web Audio Plucks</span>
+            <span>Local Browser Auto-Save Active</span>
             <span>•</span>
             <span>Keyboard Shortcuts (A-G, H for hint)</span>
           </div>

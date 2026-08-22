@@ -10,17 +10,20 @@ import { Crosshair, RotateCcw, Lightbulb, CheckCircle2, XCircle, Volume2 } from 
 interface FretboardFindModeProps {
   stats: GameStats;
   onUpdateStats: (isCorrect: boolean, noteId: string, stringNum: number) => void;
+  onUpdateSessionBest?: (mode: 'fretboard', streak: number) => void;
 }
 
 export const FretboardFindMode: React.FC<FretboardFindModeProps> = ({
   stats,
   onUpdateStats,
+  onUpdateSessionBest,
 }) => {
   const [currentNote, setCurrentNote] = useState<GuitarNote>(GUITAR_OPEN_NOTES[0]);
   const [selectedFret, setSelectedFret] = useState<{ stringNumber: number; fret: number } | null>(null);
   const [feedback, setFeedback] = useState<'idle' | 'correct' | 'wrong'>('idle');
   const [showHint, setShowHint] = useState(false);
   const [streak, setStreak] = useState(0);
+  const [sessionBestStreak, setSessionBestStreak] = useState(() => stats.fretboardSessionBest || 0);
 
   const answeredRef = useRef(false);
 
@@ -54,6 +57,13 @@ export const FretboardFindMode: React.FC<FretboardFindModeProps> = ({
 
       const nextStreak = streak + 1;
       setStreak(nextStreak);
+      if (nextStreak > sessionBestStreak) {
+        setSessionBestStreak(nextStreak);
+        if (onUpdateSessionBest) {
+          onUpdateSessionBest('fretboard', nextStreak);
+        }
+      }
+
       if (nextStreak > 0 && nextStreak % 8 === 0) {
         confetti({
           particleCount: 50,
@@ -94,12 +104,20 @@ export const FretboardFindMode: React.FC<FretboardFindModeProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="px-4 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
+          <div className="px-3.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
             <div className="text-[10px] uppercase font-bold text-amber-600 dark:text-amber-400">
               Streak
             </div>
             <div className="text-base font-extrabold text-amber-700 dark:text-amber-300">
               🎯 {streak}
+            </div>
+          </div>
+          <div className="px-3.5 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-center">
+            <div className="text-[10px] uppercase font-bold text-zinc-400">
+              Session Best
+            </div>
+            <div className="text-base font-bold text-zinc-700 dark:text-zinc-200">
+              ⭐ {sessionBestStreak}
             </div>
           </div>
         </div>
