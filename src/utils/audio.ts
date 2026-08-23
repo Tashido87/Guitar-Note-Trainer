@@ -278,6 +278,53 @@ class InstrumentAudioSynthesizer {
   }
 
   /**
+   * Play a realistic acoustic or piano chord strum
+   */
+  public playChordStrum(chordName: string = 'C', duration: number = 1.0) {
+    if (this.isMuted) return;
+
+    const chordMap: Record<string, number[]> = {
+      C: [130.81, 164.81, 196.00, 261.63, 329.63],
+      'C Major': [130.81, 164.81, 196.00, 261.63, 329.63],
+      F: [174.61, 220.00, 261.63, 349.23],
+      'F Major': [174.61, 220.00, 261.63, 349.23],
+      G: [98.00, 123.47, 146.83, 196.00, 246.94, 392.00],
+      'G Major': [98.00, 123.47, 146.83, 196.00, 246.94, 392.00],
+      G7: [98.00, 123.47, 146.83, 196.00, 246.94, 349.23],
+      Em: [82.41, 123.47, 164.81, 196.00, 246.94, 329.63],
+      'E Minor': [82.41, 123.47, 164.81, 196.00, 246.94, 329.63],
+      'E Minor (Em)': [82.41, 123.47, 164.81, 196.00, 246.94, 329.63],
+      Am: [110.00, 164.81, 220.00, 261.63, 329.63],
+      'A Minor': [110.00, 164.81, 220.00, 261.63, 329.63],
+      Dm: [146.83, 220.00, 293.66, 349.23],
+      'D Minor': [146.83, 220.00, 293.66, 349.23],
+      D: [146.83, 220.00, 293.66, 369.99],
+      'D Major': [146.83, 220.00, 293.66, 369.99],
+      D7: [146.83, 220.00, 261.63, 369.99],
+      A: [110.00, 164.81, 220.00, 277.18, 329.63],
+      A7: [110.00, 164.81, 196.00, 277.18, 329.63],
+      E: [82.41, 123.47, 164.81, 207.65, 246.94, 329.63],
+      E7: [82.41, 123.47, 146.83, 207.65, 246.94, 329.63],
+    };
+
+    const cleanName = chordName.replace(' Major', '').replace(' Minor', 'm').trim();
+    const freqs = chordMap[chordName] || chordMap[cleanName] || [130.81, 164.81, 196.00, 261.63];
+
+    // Play as quick brushed downstrum (15ms stagger per string)
+    freqs.forEach((freq, idx) => {
+      setTimeout(() => {
+        if (!this.isMuted) {
+          if (this.instrument === 'piano') {
+            this.playPianoNote(freq, duration);
+          } else {
+            this.playGuitarNote(freq, duration);
+          }
+        }
+      }, idx * 16);
+    });
+  }
+
+  /**
    * Sound effect for correct answer
    */
   public playCorrectSound() {

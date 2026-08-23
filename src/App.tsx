@@ -329,7 +329,7 @@ export default function App() {
               { id: 'arcade', label: 'Arcade Rush', icon: Flame, badge: 'Timed Game' },
               { id: 'fretboard-finder', label: 'Fretboard Pluck', icon: Crosshair },
               { id: 'reference-chart', label: 'Summary Chart', icon: BookOpen, badge: 'Book Pg 1' },
-              { id: 'bass-exercise', label: 'Pick-Strum Song', icon: Music, badge: 'Ex 18' },
+              { id: 'bass-exercise', label: 'Pick-Strum Scores', icon: Music, badge: '5 Songs' },
               { id: 'mastery', label: 'My Progress', icon: BarChart3, badge: 'Saved' },
             ].map((tab) => {
               const Icon = tab.icon;
